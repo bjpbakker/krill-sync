@@ -28,8 +28,8 @@ chrono = "0.4.18"
 dashmap = "3.11.10"
 
 [dependencies.routinator]
-git = "https://github.com/ximon18/routinator"
-rev = "31b37bd1"
+git = "https://github.com/bjpbakker/routinator"
+rev = "8ad5c04"
 default-features = false
 features = [ "native-tls", "socks" ]
 
