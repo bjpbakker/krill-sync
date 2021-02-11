@@ -117,6 +117,16 @@ pub struct Opt {
 
     /// The RRDP notification file URI of the Krill instance to sync with
     pub notification_uri: Https,
+
+    /// Run as a daemon and update on interval
+    #[cfg(feature = "daemon")]
+    #[structopt(long = "daemon")]
+    pub daemon_mode: bool,
+
+    /// Update interval when running as daemon (in seconds)
+    #[cfg(feature = "daemon")]
+    #[structopt(long = "interval", default_value = "60")]
+    pub interval: u16,
 }
 
 fn log_without_target(out: fern::FormatCallback, message: &std::fmt::Arguments, record: &log::Record) {

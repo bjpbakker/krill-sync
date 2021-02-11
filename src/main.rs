@@ -20,6 +20,8 @@ use crate::state::State;
 use anyhow::{anyhow, Result};
 use routinator::rpki::rrdp::UriAndHash;
 
+use std::path::Path;
+
 fn is_rrdp_format_enabled(opt: &Opt) -> bool {
     opt.format == Format::BOTH || opt.format == Format::RRDP
 }
@@ -100,8 +102,6 @@ fn try_main() -> Result<()> {
         lock::unlock(&lock_path).unwrap();
     });
 
-    let rrdp_http_client = http::create_client(opt.insecure);
-
     // =========================================
     // Load previously saved state, if available
     // =========================================
@@ -110,6 +110,35 @@ fn try_main() -> Result<()> {
         Some(state) => (state, true),
         None => (State::default(), false)
     };
+
+    run(&opt, state, state_loaded, &state_path)
+}
+
+#[cfg(not(feature = "daemon"))]
+fn run(opt: &Opt, state: State, state_loaded: bool, state_path: &Path) -> Result<()> {
+    let new_state = update(&opt, state, state_loaded)?;
+    state::save_state(&state_path, &new_state)?;
+    Ok(())
+}
+
+#[cfg(feature = "daemon")]
+fn run(opt: &Opt, init_state: State, state_loaded: bool, state_path: &Path) -> Result<()> {
+    use std::{thread,time};
+    let mut last_state = init_state;
+    loop {
+        let time = time::Instant::now();
+        last_state = update(&opt, last_state, state_loaded)?;
+        state::save_state(&state_path, &last_state)?;
+
+        let elapsed = time.elapsed();
+        info!("Full update cycle took: {}.{} seconds", elapsed.as_secs(), elapsed.subsec_millis());
+        thread::sleep(time::Duration::from_secs(opt.interval.into()));
+    }
+}
+
+fn update(opt: &Opt, state : State, state_loaded: bool) -> Result<State> {
+    let rrdp_http_client = http::create_client(opt.insecure);
+
     let mut new_state = state.clone();
 
     let now: SecondsSinceEpoch = Utc::now().timestamp();
@@ -286,9 +315,5 @@ fn try_main() -> Result<()> {
         }
     }
 
-    // Write out our state now that we have successfully finished
-    debug!("Writing state");
-    state::save_state(&state_path, &new_state)?;
-
-    Ok(())
+    Ok(new_state)
 }
